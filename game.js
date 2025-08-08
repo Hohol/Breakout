@@ -625,8 +625,49 @@
           // Calculate previous position using actual movement (dt-based)
           const moveX = dx * (dt / 16.67), moveY = dy * (dt / 16.67);
           const prevX = ballX - moveX, prevY = ballY - moveY;
-          const hitLeft = prevX <= br.x - ballR, hitRight = prevX >= br.x + brick.w + ballR, hitTop = prevY <= br.y - ballR, hitBottom = prevY >= br.y + brick.h + ballR;
-          if((hitLeft && !hitTop && !hitBottom) || (hitRight && !hitTop && !hitBottom)) dx = -dx; else dy = -dy;
+          
+          // Physically correct collision detection
+          // Find the closest point on the brick to the ball center
+          const closestX = Math.max(br.x, Math.min(ballX, br.x + brick.w));
+          const closestY = Math.max(br.y, Math.min(ballY, br.y + brick.h));
+          
+          // Calculate distance from ball center to closest point
+          const distX = ballX - closestX;
+          const distY = ballY - closestY;
+          const distance = Math.sqrt(distX * distX + distY * distY);
+          
+          // If distance is greater than ball radius, no collision (shouldn't happen due to outer check)
+          if (distance > ballR) continue;
+          
+          // Calculate collision normal
+          let normalX, normalY;
+          
+          if (distance === 0) {
+            // Ball center is inside brick - use previous position to determine normal
+            const prevClosestX = Math.max(br.x, Math.min(prevX, br.x + brick.w));
+            const prevClosestY = Math.max(br.y, Math.min(prevY, br.y + brick.h));
+            normalX = prevX - prevClosestX;
+            normalY = prevY - prevClosestY;
+            const prevDist = Math.sqrt(normalX * normalX + normalY * normalY);
+            if (prevDist > 0) {
+              normalX /= prevDist;
+              normalY /= prevDist;
+            } else {
+              // Fallback: use velocity direction
+              const speed = Math.sqrt(dx * dx + dy * dy);
+              normalX = speed > 0 ? -dx / speed : 0;
+              normalY = speed > 0 ? -dy / speed : -1;
+            }
+          } else {
+            // Normal case: normal points from closest point to ball center
+            normalX = distX / distance;
+            normalY = distY / distance;
+          }
+          
+          // Reflect velocity using v' = v - 2(v·n)n
+          const dotProduct = dx * normalX + dy * normalY;
+          dx = dx - 2 * dotProduct * normalX;
+          dy = dy - 2 * dotProduct * normalY;
           
           // Mark this brick as hit this frame
           frameHitBricks.add(brickKey);
