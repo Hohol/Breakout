@@ -148,6 +148,7 @@
       for(let r=0;r<brick.rows;r++){
         const t = types[k++]; const b = bricks[c][r];
         b.status = 1; b.type = t; b.hp = (t==='bomb'?2:1); b.flash = 0;
+        b.invulnerableUntil = 0; // Timestamp for temporary invulnerability
       }
     }
   }
@@ -614,6 +615,10 @@
           const brickKey = `${c},${r}`;
           if(frameHitBricks.has(brickKey)) continue; // Skip if already hit this frame
           
+          // Check bomb invulnerability
+          const now = performance.now();
+          if(br.type === 'bomb' && br.invulnerableUntil > now) continue; // Skip if bomb is invulnerable
+          
           // Calculate previous position using actual movement (dt-based)
           const moveX = dx * (dt / 16.67), moveY = dy * (dt / 16.67);
           const prevX = ballX - moveX, prevY = ballY - moveY;
@@ -624,7 +629,12 @@
           frameHitBricks.add(brickKey);
           
           br.hp = (br.hp||1) - 1; br.flash = 8;
-          if(br.type==='bomb' && br.hp>0){ SFX.bombHit(); shake = Math.min(shake+8,14); continue; }
+          if(br.type==='bomb' && br.hp>0){ 
+            SFX.bombHit(); 
+            shake = Math.min(shake+8,14); 
+            br.invulnerableUntil = now + 100; // Make bomb invulnerable for 100ms after first hit
+            continue; 
+          }
           if(br.hp<=0){
             br.status=0;
             // Combo scoring: add (combo * number of balls), then increment this ball's combo
