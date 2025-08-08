@@ -211,8 +211,38 @@
     const txt = amount>=0 ? ('+'+amount) : String(amount);
     floaters.push({ x, y, vx:(Math.random()-0.5)*0.08, vy:-0.06 - Math.random()*0.03, life:900, lifeMax:900, txt, color });
   }
+  
+  // ===== Explosion particles =====
+  const explosions = [];
+  function spawnExplosion(x, y, intensity = 1){
+    const particleCount = Math.floor(12 * intensity);
+    for(let i = 0; i < particleCount; i++){
+      const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.3;
+      const speed = 2 + Math.random() * 3;
+      const life = 600 + Math.random() * 400;
+      explosions.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life, lifeMax: life,
+        size: 2 + Math.random() * 4,
+        color: ['#ff6b6b', '#ffa94d', '#ffd43b', '#ffffff'][Math.floor(Math.random() * 4)]
+      });
+    }
+  }
   function updateFloaters(dt){
     for(let i=floaters.length-1;i>=0;i--){ const f=floaters[i]; f.x += f.vx*dt; f.y += f.vy*dt; f.life -= dt; if(f.life<=0) floaters.splice(i,1); }
+  }
+  function updateExplosions(dt){
+    for(let i=explosions.length-1;i>=0;i--){ 
+      const e=explosions[i]; 
+      e.x += e.vx*dt; 
+      e.y += e.vy*dt; 
+      e.vx *= 0.98; // slow down
+      e.vy *= 0.98;
+      e.life -= dt; 
+      if(e.life<=0) explosions.splice(i,1); 
+    }
   }
   function drawFloaters(){
     if(floaters.length===0) return;
@@ -225,6 +255,19 @@
       ctx.fillStyle = f.color; ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.lineWidth=3;
       ctx.strokeText(f.txt, f.x, f.y);
       ctx.fillText(f.txt, f.x, f.y);
+    }
+    ctx.restore();
+  }
+  function drawExplosions(){
+    if(explosions.length===0) return;
+    ctx.save();
+    for(const e of explosions){
+      const a = Math.max(0, e.life / e.lifeMax);
+      ctx.globalAlpha = Math.pow(a, 0.7);
+      ctx.fillStyle = e.color;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.size * a, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.restore();
   }
@@ -307,6 +350,20 @@
     if(e.code==='Space'){
       e.preventDefault();
       if(needsStart){ serveStart(); }
+      else if(paused && lastOverlay && lastOverlay.message && lastOverlay.message.includes('YOU WIN')){ 
+        // Proper restart sequence
+        resetLevel(true);
+        serveMessage='Press Space to start';
+        needsStart = true;
+        paused = true;
+        floaters.length = 0;
+        shake = 0;
+        lastOverlay={message:'',showScore:false};
+        lastTime = performance.now(); // Reset timing to prevent speed issues
+        requestAnimationFrame(draw);
+        // Start immediately
+        serveStart();
+      }
       else {
         paused=!paused; if(paused) lastOverlay={message:'',showScore:false};
         SFX.pause(paused); if(!paused) requestAnimationFrame(draw);
@@ -481,7 +538,7 @@
         ctx.fillText('New high score!', W/2, H/2 + 25);
         ctx.fillStyle = '#fff';
       }
-      ctx.fillText('Press Enter to play again', W/2, H/2 + 45);
+      ctx.fillText('Press Space or Enter to play again', W/2, H/2 + 45);
     }
     ctx.restore();
   }
@@ -534,7 +591,7 @@
     console.log('Win screen - isNewHighScore:', isNewHighScore, 'highScore:', highScore);
     
     showOverlay('YOU WIN! 🎉', {showScore:true, showHighScore:true, isNewHighScore, highScore});
-    waitForEnter(()=>{ restartGame(); });
+    // Don't wait for input - let the main Space handler restart the game
   }
 
   function endGameNow(){
@@ -568,6 +625,7 @@
             if(br.type==='bomb'){
               const mult = 1.5; // keep in sync with UI text
               SFX.explosion();
+              spawnExplosion(br.x + brick.w/2, br.y + brick.h/2, 1.2);
               activateBoostFor(ballObj, mult, 4000);
               shake = Math.min(shake+14,20);
             }
@@ -581,9 +639,10 @@
   }
 
   // ===== Input step (once per frame) =====
-  function stepPaddle(){
-    if(rightPressed){ paddle.x += paddle.speed; if(paddle.x > W - paddle.w) paddle.x = W - paddle.w; }
-    if(leftPressed){ paddle.x -= paddle.speed; if(paddle.x < 0) paddle.x = 0; }
+  function stepPaddle(dt){
+    const moveSpeed = paddle.speed * (dt / 16.67); // 16.67ms = 60fps
+    if(rightPressed){ paddle.x += moveSpeed; if(paddle.x > W - paddle.w) paddle.x = W - paddle.w; }
+    if(leftPressed){ paddle.x -= moveSpeed; if(paddle.x < 0) paddle.x = 0; }
   }
 
   // ===== Frame rendering =====
@@ -598,6 +657,8 @@
     drawPaddle();
     // Floating score popups (shake with the world)
     drawFloaters();
+    // Explosion particles (shake with the world)
+    drawExplosions();
     ctx.restore();
     drawHUD();
   }
@@ -624,10 +685,13 @@
     lastTime = tNow;
 
     // move paddle ONCE per frame (not per ball)
-    stepPaddle();
+    stepPaddle(dt);
 
     // update floaters
     updateFloaters(dt);
+    
+    // update explosions
+    updateExplosions(dt);
 
     // update balls
     for(let i=balls.length-1; i>=0; i--){
@@ -672,7 +736,7 @@
       }
 
       // Apply ball motion
-      ballX += dx; ballY += dy;
+      ballX += dx * (dt / 16.67); ballY += dy * (dt / 16.67);
       ballSpin += ballSpinSpeed; if(ballSpin > Math.PI*2) ballSpin -= Math.PI*2; if(ballSpin < -Math.PI*2) ballSpin += Math.PI*2;
       ballSpinSpeed *= 0.995;
       saveBall(b);
