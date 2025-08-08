@@ -302,8 +302,8 @@
   // ===== Input =====
   document.addEventListener('keydown', e=>{
     resumeAudio();
-    if(e.code==='ArrowRight' || e.key==='Right' || e.code==='KeyD' || e.key==='d' || e.key==='D') rightPressed=true;
-    if(e.code==='ArrowLeft'  || e.key==='Left'  || e.code==='KeyA' || e.key==='a' || e.key==='A') leftPressed=true;
+    if(e.code==='ArrowRight' || e.key==='Right' || e.code==='KeyD' || e.key==='d' || e.key==='D'){ e.preventDefault(); rightPressed=true; }
+    if(e.code==='ArrowLeft'  || e.key==='Left'  || e.code==='KeyA' || e.key==='a' || e.key==='A'){ e.preventDefault(); leftPressed=true; }
     if(e.code==='Space'){
       e.preventDefault();
       if(needsStart){ serveStart(); }
@@ -312,7 +312,7 @@
         SFX.pause(paused); if(!paused) requestAnimationFrame(draw);
       }
     }
-    if((e.code==='ArrowUp' || e.code==='KeyW' || e.key==='w' || e.key==='W') && !paused && saverCharges>0){ e.preventDefault(); activateBallSaver(); }
+    if(e.code==='ArrowUp' || e.key==='Up' || e.code==='KeyW' || e.key==='w' || e.key==='W'){ e.preventDefault(); if(!paused && saverCharges>0){ activateBallSaver(); } }
     if(e.code==='KeyT' || e.key==='t' || e.key==='T'){ cycleTexture(1); tone(800,{dur:0.06,gain:0.04}); renderFrame(); }
     if(e.code==='Enter'){ e.preventDefault(); restartGame(); }
     // Secret debug hotkey: P ends the game and shows score
