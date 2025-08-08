@@ -163,6 +163,7 @@
 
   // ===== Balls (multi-ball) =====
   const balls = [];
+  let frameHitBricks = new Set(); // Track bricks hit this frame to prevent multi-ball double-hits
   function makeBall(x, y, vx, vy, spin=0, spinSpeed=0){ return {x, y, dx:vx, dy:vy, spin, spinSpeed, returnSpeed: Math.hypot(vx,vy), boosted:false, boostDecay:false, boostUntil:0, combo:1}; }
   function initBallsSingle(){
     balls.length = 0;
@@ -604,14 +605,24 @@
   }
 
   // ===== Collisions (per ball) =====
-  function collisionDetectionForBall(ballObj){
+  function collisionDetectionForBall(ballObj, dt){
     for(let c=0;c<brick.cols;c++){
       for(let r=0;r<brick.rows;r++){
         const br = bricks[c][r]; if(br.status!==1) continue;
         if( ballX > br.x-ballR && ballX < br.x+brick.w+ballR && ballY > br.y-ballR && ballY < br.y+brick.h+ballR ){
-          const prevX = ballX - dx, prevY = ballY - dy;
+          // Create unique key for this brick to track frame hits
+          const brickKey = `${c},${r}`;
+          if(frameHitBricks.has(brickKey)) continue; // Skip if already hit this frame
+          
+          // Calculate previous position using actual movement (dt-based)
+          const moveX = dx * (dt / 16.67), moveY = dy * (dt / 16.67);
+          const prevX = ballX - moveX, prevY = ballY - moveY;
           const hitLeft = prevX <= br.x - ballR, hitRight = prevX >= br.x + brick.w + ballR, hitTop = prevY <= br.y - ballR, hitBottom = prevY >= br.y + brick.h + ballR;
           if((hitLeft && !hitTop && !hitBottom) || (hitRight && !hitTop && !hitBottom)) dx = -dx; else dy = -dy;
+          
+          // Mark this brick as hit this frame
+          frameHitBricks.add(brickKey);
+          
           br.hp = (br.hp||1) - 1; br.flash = 8;
           if(br.type==='bomb' && br.hp>0){ SFX.bombHit(); shake = Math.min(shake+8,14); continue; }
           if(br.hp<=0){
@@ -684,6 +695,9 @@
     const dt = Math.min(50, tNow - lastTime); // clamp to avoid big jumps
     lastTime = tNow;
 
+    // Clear frame hit tracking for new frame
+    frameHitBricks.clear();
+
     // move paddle ONCE per frame (not per ball)
     stepPaddle(dt);
 
@@ -711,7 +725,7 @@
         }
       }
       // Collisions with bricks
-      collisionDetectionForBall(b);
+      collisionDetectionForBall(b, dt);
       // Walls
       if(ballX+dx > W-ballR || ballX+dx < ballR){ dx=-dx; SFX.wall(); }
       if(ballY+dy < ballR){ dy=-dy; SFX.wall(); }
@@ -815,7 +829,7 @@
           const sStart = score;
           useBall(cloneBall); dx=0; dy=2;
           ballX = tInh.br.x + brick.w/2; ballY = tInh.br.y + brick.h/2;
-          collisionDetectionForBall(cloneBall);
+          collisionDetectionForBall(cloneBall, 16.67); // Use default dt for tests
           const expectedGain = prevCombo * balls.length;
           console.assert(score === sStart + expectedGain, 'Clone should score inherited combo × balls');
           console.assert(cloneBall.combo === prevCombo + 1, 'Clone combo should increment after scoring');
@@ -900,7 +914,7 @@
           ballX = target.br.x + brick.w/2; ballY = target.br.y - ballR - 1; // above the brick
           const speedBefore = Math.hypot(dx,dy);
           target.br.hp = 1; // make this the final hit (explosion path)
-          collisionDetectionForBall(balls[0]);
+          collisionDetectionForBall(balls[0], 16.67); // Use default dt for tests
           console.assert(dy < 0, 'Bomb final hit should bounce (dy inverted)');
           const speedAfter = Math.hypot(dx,dy);
           console.assert(speedAfter > speedBefore*1.2, 'Bomb explosion should increase speed of triggering ball');
@@ -913,9 +927,9 @@
       function findNormal(){ for(let c=0;c<brick.cols;c++) for(let r=0;r<brick.rows;r++){ const br=bricks[c][r]; if(br.status===1 && br.type==='normal') return {c,r,br}; } return null; }
       // Single-ball scoring (combo starts at 1 ⇒ +1)
       while(balls.length>1) balls.pop();
-      let t = findNormal(); if(t){ const s0=score; const f0=floaters.length; const b=balls[0]; b.combo=1; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y+brick.h/2; collisionDetectionForBall(b); console.assert(score===s0+1, 'Score should increase by 1 (combo1×1 ball)'); console.assert(b.combo===2, 'Combo should increment to 2 after brick'); console.assert(floaters.length===f0+1 && floaters[floaters.length-1].txt==='+1','Floater +1 should spawn on score'); t.br.status=1; t.br.hp=1; }
+      let t = findNormal(); if(t){ const s0=score; const f0=floaters.length; const b=balls[0]; b.combo=1; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y+brick.h/2; collisionDetectionForBall(b, 16.67); console.assert(score===s0+1, 'Score should increase by 1 (combo1×1 ball)'); console.assert(b.combo===2, 'Combo should increment to 2 after brick'); console.assert(floaters.length===f0+1 && floaters[floaters.length-1].txt==='+1','Floater +1 should spawn on score'); t.br.status=1; t.br.hp=1; }
       // Two-ball scoring with same ball (combo now 2 ⇒ +4)
-      duplicateBallFrom(balls[0]); t = findNormal(); if(t){ const s1=score; const f1=floaters.length; const b=balls[0]; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y+brick.h/2; collisionDetectionForBall(b); console.assert(score===s1+4, 'Score should increase by 4 (combo2×2 balls)'); console.assert(b.combo===3, 'Combo should increment to 3 after second brick'); console.assert(floaters.length===f1+1 && floaters[floaters.length-1].txt==='+4','Floater +4 should spawn on score'); t.br.status=1; t.br.hp=1; }
+      duplicateBallFrom(balls[0]); t = findNormal(); if(t){ const s1=score; const f1=floaters.length; const b=balls[0]; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y+brick.h/2; collisionDetectionForBall(b, 16.67); console.assert(score===s1+4, 'Score should increase by 4 (combo2×2 balls)'); console.assert(b.combo===3, 'Combo should increment to 3 after second brick'); console.assert(floaters.length===f1+1 && floaters[floaters.length-1].txt==='+4','Floater +4 should spawn on score'); t.br.status=1; t.br.hp=1; }
 
       // BallSaver tests: 3 charges per game, persist across life, reset on full reset
       while(balls.length<2) duplicateBallFrom(balls[0]);
