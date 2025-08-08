@@ -455,6 +455,7 @@
   function drawHUD(){
     ctx.font='16px system-ui,-apple-system,Segoe UI,Roboto,Arial'; ctx.textBaseline='top'; ctx.fillStyle='#cfd8e3';
     ctx.textAlign='left'; ctx.fillText('Score: '+score, 10, 10);
+    ctx.fillText('High Score: '+getHighScore(), 10, 30);
     
     ctx.textAlign='center';
     if(balls.some(b=>b.boosted)){ ctx.fillStyle='#74c0fc'; ctx.fillText('BOOST!', W/2, 10); }
@@ -463,26 +464,76 @@
   }
 
   function showOverlay(message, opts={}){
-    const {showScore=false} = opts;
-    lastOverlay = {message, showScore};
+    const {showScore=false, showHighScore=false, isNewHighScore=false, highScore=0} = opts;
+    lastOverlay = {message, showScore, showHighScore, isNewHighScore, highScore};
+    console.log('showOverlay called with:', {message, showScore, showHighScore, isNewHighScore, highScore});
     ctx.save();
     ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,0,W,H);
     ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.font='bold 28px system-ui,-apple-system,Segoe UI,Roboto,Arial';
-    ctx.fillText(message, W/2, H/2 - 20);
+    ctx.fillText(message, W/2 + 15, H/2 - 20);
     if(showScore){
       ctx.font='16px system-ui,-apple-system,Segoe UI,Roboto,Arial';
-      ctx.fillText('Score: '+score, W/2, H/2 + 10);
-      ctx.fillText('Press Enter to play again', W/2, H/2 + 40);
+      ctx.fillText('Score: '+score, W/2, H/2 + 5);
+      if(showHighScore && isNewHighScore){
+        console.log('Drawing NEW HIGH SCORE message');
+        ctx.fillStyle = '#ffd43b';
+        ctx.fillText('New high score!', W/2, H/2 + 25);
+        ctx.fillStyle = '#fff';
+      }
+      ctx.fillText('Press Enter to play again', W/2, H/2 + 45);
     }
     ctx.restore();
+  }
+
+  // ===== High Score Management =====
+  function getHighScore(){
+    const cookies = document.cookie.split(';');
+    for(const cookie of cookies){
+      const [name, value] = cookie.trim().split('=');
+      if(name === 'breakout_high_score'){
+        return parseInt(value) || 0;
+      }
+    }
+    return 0;
+  }
+
+  function setHighScore(score){
+    document.cookie = `breakout_high_score=${score};max-age=31536000;path=/`; // 1 year expiry
+  }
+
+  function clearHighScore(){
+    document.cookie = 'breakout_high_score=;max-age=0;path=/';
+  }
+  
+  // Make functions accessible globally for debugging
+  window.clearHighScore = clearHighScore;
+  window.setHighScore = setHighScore;
+  window.getHighScore = getHighScore;
+
+  function updateHighScore(){
+    const currentHigh = getHighScore();
+    console.log('Current score:', score, 'Current high score:', currentHigh);
+    if(score > currentHigh){
+      setHighScore(score);
+      console.log('New high score set!');
+      return true; // new high score
+    }
+    console.log('No new high score');
+    return false; // no new high score
   }
 
   function showWinScreen(){
     paused = true;
     renderFrame();
     if(SFX && SFX.win) SFX.win();
-    showOverlay('YOU WIN! 🎉', {showScore:true});
+    
+    const isNewHighScore = updateHighScore();
+    const highScore = getHighScore();
+    
+    console.log('Win screen - isNewHighScore:', isNewHighScore, 'highScore:', highScore);
+    
+    showOverlay('YOU WIN! 🎉', {showScore:true, showHighScore:true, isNewHighScore, highScore});
     waitForEnter(()=>{ restartGame(); });
   }
 
@@ -556,11 +607,16 @@
   function draw(){
     if(paused){
       renderFrame();
-      if(lastOverlay && lastOverlay.message){
-        showOverlay(lastOverlay.message, {showScore:lastOverlay.showScore});
-      } else {
-        showOverlay(needsStart ? serveMessage : 'PAUSED – Press Space to resume');
-      }
+              if(lastOverlay && lastOverlay.message){
+          showOverlay(lastOverlay.message, {
+            showScore: lastOverlay.showScore,
+            showHighScore: lastOverlay.showHighScore,
+            isNewHighScore: lastOverlay.isNewHighScore,
+            highScore: lastOverlay.highScore
+          });
+        } else {
+          showOverlay(needsStart ? serveMessage : 'PAUSED – Press Space to resume');
+        }
       return;
     }
     tNow = performance.now();
@@ -826,11 +882,14 @@
       console.assert(balls.length === 1, 'Restart leaves a single ball');
       console.assert(saverCharges === SAVER_MAX, 'Restart restores saver charges');
       // Debug end screen should pause and display score without changing it
+      const originalHighScore = getHighScore();
       score = 4321; lastOverlay = {message:'',showScore:false}; paused = false; endGameNow();
       console.assert(paused === true, 'endGameNow should pause the game');
       console.assert(lastOverlay && lastOverlay.showScore === true, 'End screen should show score line');
       console.assert(/YOU WIN/.test(lastOverlay.message), 'End screen message should indicate win');
       console.assert(score === 4321, 'endGameNow must not change the score');
+      // Restore original high score after test
+      setHighScore(originalHighScore);
       let aliveAfter = 0; for(let c=0;c<brick.cols;c++) for(let r=0;r<brick.rows;r++) if(bricks[c][r].status===1) aliveAfter++;
       console.assert(aliveAfter === brick.cols*brick.rows, 'Restart re-randomizes full grid of bricks');
 
@@ -857,6 +916,13 @@
       console.assert(AC === acWas, 'Audio should not auto-start during tests');
       console.assert(shake === 0, 'No residual shake after tests');
       console.assert(floaters.length === 0, 'No residual score popups after tests');
+
+      // Test high score functionality
+      const testHighScore = getHighScore();
+      setHighScore(1000);
+      console.assert(getHighScore() === 1000, 'High score should be set to 1000');
+      setHighScore(testHighScore); // restore original
+      console.assert(getHighScore() === testHighScore, 'High score should be restored');
 
       console.log('All tests passed.');
       console.groupEnd();
