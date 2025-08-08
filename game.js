@@ -321,7 +321,10 @@
     floaters.length = 0;
     shake = 0;
     lastOverlay={message:'',showScore:false};
+    lastTime = performance.now(); // Reset timing to prevent speed issues
     requestAnimationFrame(draw);
+    // Immediately start the game
+    serveStart();
   }
 
   // Paddle hit handler (also used by tests)
