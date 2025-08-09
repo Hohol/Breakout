@@ -121,7 +121,7 @@
   }
 
   // ===== Game state =====
-  const ballR = 8; let ballX = W/2, ballY = H-30; let dx = 3, dy = -3; let ballSpin = 0, ballSpinSpeed = 0;
+  const ballR = 8;
   const paddle = { w:96, h:12, x:(W-96)/2, y:H-22, speed:7 };
   const brick = { rows:5, cols:8, padding:10, offsetTop:60, offsetLeft:30, w:0, h:20 };
   brick.w = Math.floor((W - brick.offsetLeft*2 - brick.padding*(brick.cols-1))/brick.cols);
@@ -175,11 +175,7 @@
     const vx = Math.cos(ang) * speed;
     const vy = Math.sin(ang) * speed; // < 0 (upwards)
     const b = makeBall(W/2, H-30, vx, vy, 0, 0); balls.push(b);
-    // (removed sync globals - drawBall now takes ball object directly)
-    ballX=b.x; ballY=b.y; dx=b.dx; dy=b.dy; ballSpin=b.spin; ballSpinSpeed=b.spinSpeed;
   }
-  function useBall(b){ ballX=b.x; ballY=b.y; dx=b.dx; dy=b.dy; ballSpin=b.spin; ballSpinSpeed=b.spinSpeed; }
-  function saveBall(b){ b.x=ballX; b.y=ballY; b.dx=dx; b.dy=dy; b.spin=ballSpin; b.spinSpeed=ballSpinSpeed; }
   function duplicateBallFrom(src){
     // Clone spawns offset from source but flies in a RANDOM direction.
     // If source was boosted, use its base returnSpeed magnitude for the clone.
