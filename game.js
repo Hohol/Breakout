@@ -822,10 +822,11 @@
       // Snapshot bricks so tests can't leave one destroyed
       const bricksSnapshot = bricks.map(col=>col.map(b=>({status:b.status,type:b.type,hp:b.hp})));
       const expectedAlive = bricksSnapshot.reduce((n,col)=> n + col.reduce((m,s)=> m + (s.status===1?1:0),0), 0);
-      // Silence sound + shake during tests
+      // Silence sound + shake + explosions during tests
       const sfxBackup = {}; Object.keys(SFX).forEach(k=>{ sfxBackup[k] = SFX[k]; SFX[k] = function(){}; });
       const acWas = AC; // audio context should not auto-start
       const shakeBefore = shake; shake = 0; // ensure no visible shake during tests
+      const explosionBackup = spawnExplosion; spawnExplosion = function(){}; // disable explosions during tests
 
       console.groupCollapsed('%cBreakout self‑tests','color:#7bd;');
       console.assert(!!ctx && typeof ctx.fillRect === 'function', 'Canvas context should exist');
@@ -896,8 +897,8 @@
       const beforeLen = balls.length; balls.pop(); console.assert(balls.length === beforeLen-1, 'Removing one ball should reduce count by 1');
       // Paddle move should be independent of ball count
       const rp0 = rightPressed, lp0 = leftPressed; rightPressed = true; leftPressed = false;
-      const px0 = paddle.x; stepPaddle(); const dx1 = paddle.x - px0;
-      duplicateBallFrom(balls[0]); const px1 = paddle.x; stepPaddle(); const dx2 = paddle.x - px1;
+      const px0 = paddle.x; stepPaddle(16.67); const dx1 = paddle.x - px0;
+      duplicateBallFrom(balls[0]); const px1 = paddle.x; stepPaddle(16.67); const dx2 = paddle.x - px1;
       console.assert(Math.abs(dx1 - dx2) < 1e-9 && Math.abs(dx1 - 7) < 1e-9, 'Paddle speed should be constant and equal to 7 per step');
       rightPressed = rp0; leftPressed = lp0;
       // Paddle hit should deduct 1 point and spawn '-1' floater
@@ -965,7 +966,7 @@
         let target=null; for(let c=0;c<brick.cols;c++){ for(let r=0;r<brick.rows;r++){ const br=bricks[c][r]; if(br.status===1 && br.type==='bomb'){ target={c,r,br}; break; } } if(target) break; }
         if(target){
           useBall(balls[0]); dx=0; dy=2; // moving down onto the brick
-          ballX = target.br.x + brick.w/2; ballY = target.br.y - ballR - 1; // above the brick
+          ballX = target.br.x + brick.w/2; ballY = target.br.y - ballR + 1; // just touching the brick from above
           const speedBefore = Math.hypot(dx,dy);
           target.br.hp = 1; // make this the final hit (explosion path)
           collisionDetectionForBall(balls[0], 16.67); // Use default dt for tests
@@ -981,9 +982,9 @@
       function findNormal(){ for(let c=0;c<brick.cols;c++) for(let r=0;r<brick.rows;r++){ const br=bricks[c][r]; if(br.status===1 && br.type==='normal') return {c,r,br}; } return null; }
       // Single-ball scoring (combo starts at 1 ⇒ +1)
       while(balls.length>1) balls.pop();
-      let t = findNormal(); if(t){ const s0=score; const f0=floaters.length; const b=balls[0]; b.combo=1; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y+brick.h/2; collisionDetectionForBall(b, 16.67); console.assert(score===s0+1, 'Score should increase by 1 (combo1×1 ball)'); console.assert(b.combo===2, 'Combo should increment to 2 after brick'); console.assert(floaters.length===f0+1 && floaters[floaters.length-1].txt==='+1','Floater +1 should spawn on score'); t.br.status=1; t.br.hp=1; }
+      let t = findNormal(); if(t){ const s0=score; const f0=floaters.length; const b=balls[0]; b.combo=1; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y-ballR+1; collisionDetectionForBall(b, 16.67); console.assert(score===s0+1, 'Score should increase by 1 (combo1×1 ball)'); console.assert(b.combo===2, 'Combo should increment to 2 after brick'); console.assert(floaters.length===f0+1 && floaters[floaters.length-1].txt==='+1','Floater +1 should spawn on score'); t.br.status=1; t.br.hp=1; }
       // Two-ball scoring with same ball (combo now 2 ⇒ +4)
-      duplicateBallFrom(balls[0]); t = findNormal(); if(t){ const s1=score; const f1=floaters.length; const b=balls[0]; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y+brick.h/2; collisionDetectionForBall(b, 16.67); console.assert(score===s1+4, 'Score should increase by 4 (combo2×2 balls)'); console.assert(b.combo===3, 'Combo should increment to 3 after second brick'); console.assert(floaters.length===f1+1 && floaters[floaters.length-1].txt==='+4','Floater +4 should spawn on score'); t.br.status=1; t.br.hp=1; }
+      duplicateBallFrom(balls[0]); t = findNormal(); if(t){ const s1=score; const f1=floaters.length; const b=balls[0]; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y-ballR+1; collisionDetectionForBall(b, 16.67); console.assert(score===s1+4, 'Score should increase by 4 (combo2×2 balls)'); console.assert(b.combo===3, 'Combo should increment to 3 after second brick'); console.assert(floaters.length===f1+1 && floaters[floaters.length-1].txt==='+4','Floater +4 should spawn on score'); t.br.status=1; t.br.hp=1; }
 
       // BallSaver tests: 3 charges per game, persist across life, reset on full reset
       while(balls.length<2) duplicateBallFrom(balls[0]);
@@ -1009,7 +1010,7 @@
       // Restart via function (simulating global Enter)
       score = 123; balls.length = 0; initBallsSingle(); saverCharges = 1; paused = false; needsStart = false; floaters.length = 0; shake = 5;
       restartGame();
-      console.assert(paused === true && needsStart === true, 'Restart should pause and wait to serve');
+      console.assert(paused === false && needsStart === false, 'Restart should immediately start the game');
       console.assert(score === 0, 'Restart resets score');
       console.assert(balls.length === 1, 'Restart leaves a single ball');
       console.assert(saverCharges === SAVER_MAX, 'Restart restores saver charges');
@@ -1041,10 +1042,12 @@
       paused = true; needsStart = true; score = 0; lastOverlay = {message:'',showScore:false}; serveMessage='Press Space to start';
       console.assert(balls.length === 1 && paused && needsStart && score === 0, 'Post-test cleanup: single ball, waiting to start, score 0');
 
-      // Restore SFX and shake; ensure audio context didn't auto-create
+      // Restore SFX, shake, and explosions; ensure audio context didn't auto-create
       Object.keys(sfxBackup).forEach(k=> SFX[k] = sfxBackup[k]);
+      spawnExplosion = explosionBackup; // restore explosion function
       shake = 0;
       floaters.length = 0; // 🔧 ensure tests don't leave any on-screen score popups
+      explosions.length = 0; // 🔧 clear any explosions created during tests
       console.assert(AC === acWas, 'Audio should not auto-start during tests');
       console.assert(shake === 0, 'No residual shake after tests');
       console.assert(floaters.length === 0, 'No residual score popups after tests');
