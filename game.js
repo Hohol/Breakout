@@ -817,6 +817,13 @@
   }
 
   // ===== Self‑tests (console) =====
+  function assert(condition, message) {
+    if (!condition) {
+      console.error('Test failed:', message);
+      throw new Error(message);
+    }
+  }
+  
   function runSelfTests(){
     try {
       // Snapshot bricks so tests can't leave one destroyed
@@ -829,20 +836,20 @@
       const explosionBackup = spawnExplosion; spawnExplosion = function(){}; // disable explosions during tests
 
       console.groupCollapsed('%cBreakout self‑tests','color:#7bd;');
-      console.assert(!!ctx && typeof ctx.fillRect === 'function', 'Canvas context should exist');
-      console.assert(currentTexture()==='rgb','Default texture should be rgb');
-      console.assert(ballR>0 && brick.w>0 && brick.h>0, 'Dimensions should be positive');
-      console.assert(bricks.length===brick.cols && bricks[0].length===brick.rows, 'Bricks grid size');
-      console.assert(typeof draw === 'function' && typeof renderFrame === 'function', 'Main loop functions exist');
-      console.assert(typeof SFX.wall === 'function' && typeof SFX.win === 'function', 'SFX functions exist');
-      ensureGolfPatterns(); console.assert(!!golfPatternDark && !!golfPatternLight, 'Golf dimple patterns should be created');
-      const beforeOp = ctx.globalCompositeOperation; drawBall(); console.assert(ctx.globalCompositeOperation === 'source-over', 'Composite op restored after drawBall');
-      console.assert(paused === true && needsStart === true, 'Game should start paused and waiting for Space');
-      const prevSpin=balls[0].spinSpeed; balls[0].spinSpeed=0; applyServeSpin(); console.assert(Math.abs(balls[0].spinSpeed)>0.001, 'applyServeSpin should prime spin on serve'); balls[0].spinSpeed=prevSpin;
+      assert(!!ctx && typeof ctx.fillRect === 'function', 'Canvas context should exist');
+      assert(currentTexture()==='rgb','Default texture should be rgb');
+      assert(ballR>0 && brick.w>0 && brick.h>0, 'Dimensions should be positive');
+      assert(bricks.length===brick.cols && bricks[0].length===brick.rows, 'Bricks grid size');
+      assert(typeof draw === 'function' && typeof renderFrame === 'function', 'Main loop functions exist');
+      assert(typeof SFX.wall === 'function' && typeof SFX.win === 'function', 'SFX functions exist');
+      ensureGolfPatterns(); assert(!!golfPatternDark && !!golfPatternLight, 'Golf dimple patterns should be created');
+      const beforeOp = ctx.globalCompositeOperation; drawBall(); assert(ctx.globalCompositeOperation === 'source-over', 'Composite op restored after drawBall');
+      assert(paused === true && needsStart === true, 'Game should start paused and waiting for Space');
+      const prevSpin=balls[0].spinSpeed; balls[0].spinSpeed=0; applyServeSpin(); assert(Math.abs(balls[0].spinSpeed)>0.001, 'applyServeSpin should prime spin on serve'); balls[0].spinSpeed=prevSpin;
       // Counts (randomized layout): 4 bombs, 4 clones, rest normal; bombs must be 2 HP
       let counts={bomb:0,clone:0,normal:0}, bombs2hp=true; for(let c=0;c<brick.cols;c++) for(let r=0;r<brick.rows;r++){ const t=bricks[c][r].type; counts[t]++; if(t==='bomb' && bricks[c][r].hp!==2) bombs2hp=false; }
-      console.assert(counts.bomb===4 && counts.clone===4 && counts.normal===brick.cols*brick.rows-8, 'Randomized counts for bomb/clone/normal should be 4/4/rest');
-      console.assert(bombs2hp, 'All bombs should start with 2 HP');
+      assert(counts.bomb===4 && counts.clone===4 && counts.normal===brick.cols*brick.rows-8, 'Randomized counts for bomb/clone/normal should be 4/4/rest');
+      assert(bombs2hp, 'All bombs should start with 2 HP');
       // LED should be inside the bomb block (y + h*0.24), not at y*h*0.24
       { drawBricks(); let checked=false, ok=true; const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
         for(let c=0;c<brick.cols;c++){ for(let r=0;r<brick.rows;r++){ const br=bricks[c][r]; if(br.status===1 && br.type==='bomb'){
@@ -853,28 +860,28 @@
           const pA = ctx.getImageData(sx, syA, 1, 1).data, pB = ctx.getImageData(sx, syB, 1, 1).data;
           const lum = (p)=>0.2126*p[0]+0.7152*p[1]+0.0722*p[2]; if(lum(pA) < lum(pB) + 5) ok=false; checked=true; break; }
         if(checked) break; } }
-        console.assert(checked && ok, 'Bomb LED drawn at correct y (inside its brick)'); }
+        assert(checked && ok, 'Bomb LED drawn at correct y (inside its brick)'); }
       // Ball split visibility sanity
       const oldTex = textureIndex; const splitIdx = TEXTURES.indexOf('split'); textureIndex = splitIdx>=0?splitIdx:0; renderFrame();
       const lx = Math.max(0, Math.min(W-1, Math.round(balls[0].x - ballR*0.5)));
       const rx = Math.max(0, Math.min(W-1, Math.round(balls[0].x + ballR*0.5)));
       const y  = Math.max(0, Math.min(H-1, Math.round(balls[0].y)));
-      const pL = ctx.getImageData(lx, y, 1, 1).data; const pR = ctx.getImageData(rx, y, 1, 1).data; const lum = (p)=>0.2126*p[0]+0.7152*p[1]+0.0722*p[2]; console.assert(lum(pR) > lum(pL) + 20, 'Ball texture split should be visible (right brighter than left)');
+      const pL = ctx.getImageData(lx, y, 1, 1).data; const pR = ctx.getImageData(rx, y, 1, 1).data; const lum = (p)=>0.2126*p[0]+0.7152*p[1]+0.0722*p[2]; assert(lum(pR) > lum(pL) + 20, 'Ball texture split should be visible (right brighter than left)');
       // Sports textures presence
-      console.assert(TEXTURES.includes('golf') && TEXTURES.includes('basketball') && TEXTURES.includes('volleyball') && TEXTURES.includes('tennis'), 'Sports textures should exist');
+      assert(TEXTURES.includes('golf') && TEXTURES.includes('basketball') && TEXTURES.includes('volleyball') && TEXTURES.includes('tennis'), 'Sports textures should exist');
       // Tennis center green dominance
-      const tennisIdx = TEXTURES.indexOf('tennis'); if(tennisIdx>=0){ textureIndex = tennisIdx; renderFrame(); const pc = ctx.getImageData(Math.round(balls[0].x), Math.round(balls[0].y), 1, 1).data; console.assert(pc[1] > pc[0] + 15 && pc[1] > pc[2] + 15, 'Tennis center pixel should be green dominant'); }
+      const tennisIdx = TEXTURES.indexOf('tennis'); if(tennisIdx>=0){ textureIndex = tennisIdx; renderFrame(); const pc = ctx.getImageData(Math.round(balls[0].x), Math.round(balls[0].y), 1, 1).data; assert(pc[1] > pc[0] + 15 && pc[1] > pc[2] + 15, 'Tennis center pixel should be green dominant'); }
       textureIndex = oldTex;
       // RGB sector verification
-      const oldTexRGB = textureIndex; const rgbIdx = TEXTURES.indexOf('rgb'); if(rgbIdx>=0){ textureIndex = rgbIdx; renderFrame(); const samp = (ang)=>{ const x=Math.round(balls[0].x+Math.cos(ang)*ballR*0.6); const y=Math.round(balls[0].y+Math.sin(ang)*ballR*0.6); return ctx.getImageData(x,y,1,1).data; }; const rP = samp(0.0), gP = samp(2*Math.PI/3), bP = samp(4*Math.PI/3); const maxCh = (p)=>{ const a=[p[0],p[1],p[2]]; let m=0; if(a[1]>a[m]) m=1; if(a[2]>a[m]) m=2; return m; }; console.assert(maxCh(rP)===0 && maxCh(gP)===1 && maxCh(bP)===2, 'RGB sectors should be red/green/blue'); textureIndex = oldTexRGB; }
+      const oldTexRGB = textureIndex; const rgbIdx = TEXTURES.indexOf('rgb'); if(rgbIdx>=0){ textureIndex = rgbIdx; renderFrame(); const samp = (ang)=>{ const x=Math.round(balls[0].x+Math.cos(ang)*ballR*0.6); const y=Math.round(balls[0].y+Math.sin(ang)*ballR*0.6); return ctx.getImageData(x,y,1,1).data; }; const rP = samp(0.0), gP = samp(2*Math.PI/3), bP = samp(4*Math.PI/3); const maxCh = (p)=>{ const a=[p[0],p[1],p[2]]; let m=0; if(a[1]>a[m]) m=1; if(a[2]>a[m]) m=2; return m; }; assert(maxCh(rP)===0 && maxCh(gP)===1 && maxCh(bP)===2, 'RGB sectors should be red/green/blue'); textureIndex = oldTexRGB; }
       // CLONE: duplicating adds ball with base-speed magnitude (random direction; no boost inherit)
       const n0 = balls.length; const ref = {...balls[0]};
       const baseSp = (ref.boosted && ref.returnSpeed) ? ref.returnSpeed : Math.hypot(ref.dx, ref.dy);
       duplicateBallFrom(balls[0]);
-      console.assert(balls.length===n0+1, 'Duplicate should add a new ball');
+      assert(balls.length===n0+1, 'Duplicate should add a new ball');
       const last = balls[balls.length-1]; const lastSp = Math.hypot(last.dx,last.dy);
-      console.assert(Math.abs(lastSp - baseSp) < Math.max(1e-3, 0.02*baseSp), 'Clone speed ≈ base speed (no boost)');
-      console.assert(last.combo === ref.combo, 'Clone should inherit combo from source');
+      assert(Math.abs(lastSp - baseSp) < Math.max(1e-3, 0.02*baseSp), 'Clone speed ≈ base speed (no boost)');
+      assert(last.combo === ref.combo, 'Clone should inherit combo from source');
       // Inherited combo scoring: let clone immediately break a brick
       {
         const cloneBall = last;
@@ -886,20 +893,20 @@
           ballX = tInh.br.x + brick.w/2; ballY = tInh.br.y + brick.h/2;
           collisionDetectionForBall(cloneBall, 16.67); // Use default dt for tests
           const expectedGain = prevCombo * balls.length;
-          console.assert(score === sStart + expectedGain, 'Clone should score inherited combo × balls');
-          console.assert(cloneBall.combo === prevCombo + 1, 'Clone combo should increment after scoring');
+          assert(score === sStart + expectedGain, 'Clone should score inherited combo × balls');
+          assert(cloneBall.combo === prevCombo + 1, 'Clone combo should increment after scoring');
         }
       }
       // Texture cycle
-      const t0 = currentTexture(); cycleTexture(1); const t1 = currentTexture(); console.assert(t0!==t1 && TEXTURES.includes(t1), 'Texture cycle changes to a valid mode'); cycleTexture(-1); console.assert(currentTexture()===t0, 'Texture cycle backward restores previous');
+      const t0 = currentTexture(); cycleTexture(1); const t1 = currentTexture(); assert(t0!==t1 && TEXTURES.includes(t1), 'Texture cycle changes to a valid mode'); cycleTexture(-1); assert(currentTexture()===t0, 'Texture cycle backward restores previous');
       // Multiball removal when >1 ball
       const before = balls.length; if(before<2){ duplicateBallFrom(balls[0]); }
-      const beforeLen = balls.length; balls.pop(); console.assert(balls.length === beforeLen-1, 'Removing one ball should reduce count by 1');
+      const beforeLen = balls.length; balls.pop(); assert(balls.length === beforeLen-1, 'Removing one ball should reduce count by 1');
       // Paddle move should be independent of ball count
       const rp0 = rightPressed, lp0 = leftPressed; rightPressed = true; leftPressed = false;
       const px0 = paddle.x; stepPaddle(16.67); const dx1 = paddle.x - px0;
       duplicateBallFrom(balls[0]); const px1 = paddle.x; stepPaddle(16.67); const dx2 = paddle.x - px1;
-      console.assert(Math.abs(dx1 - dx2) < 1e-9 && Math.abs(dx1 - 7) < 1e-9, 'Paddle speed should be constant and equal to 7 per step');
+      assert(Math.abs(dx1 - dx2) < 1e-9 && Math.abs(dx1 - 7) < 1e-9, 'Paddle speed should be constant and equal to 7 per step');
       rightPressed = rp0; leftPressed = lp0;
       // Paddle hit should deduct 1 point and spawn '-1' floater
       {
@@ -911,17 +918,17 @@
         dx = 0; dy = 2;
         const s0 = score; const f0 = floaters.length;
         onPaddleHit(b, 0, Math.hypot(dx,dy));
-        console.assert(score === s0 - 1, 'Paddle hit should deduct 1 point');
-        console.assert(floaters.length === f0 + 1 && floaters[floaters.length-1].txt === '-1', 'Penalty floater "-1" should spawn');
-        console.assert(b.combo === 1, 'Paddle hit resets combo to 1');
+        assert(score === s0 - 1, 'Paddle hit should deduct 1 point');
+        assert(floaters.length === f0 + 1 && floaters[floaters.length-1].txt === '-1', 'Penalty floater "-1" should spawn');
+        assert(b.combo === 1, 'Paddle hit resets combo to 1');
       }
 
       // Ball-lost penalty: -10 points and floater
       {
         const s0 = score; const f0 = floaters.length;
         onBallLost(W/2, H-10);
-        console.assert(score === s0 - 10, 'Ball lost deducts LOSS_PENALTY');
-        console.assert(floaters.length === f0 + 1 && floaters[floaters.length-1].txt === '-10', 'Ball lost spawns "-10" floater');
+        assert(score === s0 - 10, 'Ball lost deducts LOSS_PENALTY');
+        assert(floaters.length === f0 + 1 && floaters[floaters.length-1].txt === '-10', 'Ball lost spawns "-10" floater');
       }
       // Multi-ball: losing one ball should apply penalty once and reduce ball count
       {
@@ -931,7 +938,7 @@
         const s1 = score; const f1 = floaters.length;
         onBallLost(balls[0].x, H-10);
         balls.splice(0,1);
-        console.assert(score === s1 - 10 && balls.length === beforeCount-1, 'Losing one ball applies -10 and removes one ball');
+        assert(score === s1 - 10 && balls.length === beforeCount-1, 'Losing one ball applies -10 and removes one ball');
       }
 
       // Random serve direction: upward at start and after lastBallOut
@@ -942,22 +949,22 @@
           const sp = Math.hypot(balls[0].dx, balls[0].dy);
           ok = ok && (balls[0].dy < -0.2) && (Math.abs(sp - Math.hypot(3,3)) < 0.05);
         }
-        console.assert(ok, 'initBallsSingle serves upward with ~speed 4.24');
+        assert(ok, 'initBallsSingle serves upward with ~speed 4.24');
       }
       {
         paddle.x = 5; const keep = saverCharges; lastBallOut();
-        console.assert(Math.abs(paddle.x - (W-paddle.w)/2) < 1e-6, 'Paddle recenters on lastBallOut');
-        console.assert(balls.length===1 && paused===true && needsStart===true, 'lastBallOut pauses and waits to serve');
-        console.assert(balls[0].dy < 0, 'Respawn ball dy should be upward');
-        console.assert(saverCharges === keep, 'Saver charges unchanged on respawn');
+        assert(Math.abs(paddle.x - (W-paddle.w)/2) < 1e-6, 'Paddle recenters on lastBallOut');
+        assert(balls.length===1 && paused===true && needsStart===true, 'lastBallOut pauses and waits to serve');
+        assert(balls[0].dy < 0, 'Respawn ball dy should be upward');
+        assert(saverCharges === keep, 'Saver charges unchanged on respawn');
       }
 
       // Boost should persist for triggering ball only
       while(balls.length>1) balls.pop();
-      const b0 = balls[0]; useBall(b0); const sOld = Math.hypot(dx,dy); const mult=1.5; activateBoostFor(b0, mult, 1); saveBall(b0); const sNew = Math.hypot(b0.dx,b0.dy); console.assert(sNew > sOld*1.3, 'Boost should persist for boosted ball after saveBall');
-      duplicateBallFrom(b0); const b1 = balls[1]; const s1 = Math.hypot(b1.dx,b1.dy); console.assert(Math.abs(s1 - b1.returnSpeed) < 1e-6, 'Clone should not inherit boost magnitude');
+      const b0 = balls[0]; useBall(b0); const sOld = Math.hypot(dx,dy); const mult=1.5; activateBoostFor(b0, mult, 1); saveBall(b0); const sNew = Math.hypot(b0.dx,b0.dy); assert(sNew > sOld*1.3, 'Boost should persist for boosted ball after saveBall');
+      duplicateBallFrom(b0); const b1 = balls[1]; const s1 = Math.hypot(b1.dx,b1.dy); assert(Math.abs(s1 - b1.returnSpeed) < 1e-6, 'Clone should not inherit boost magnitude');
       // Non-trigger ball must not change when other ball boosts
-      while(balls.length>1) balls.pop(); duplicateBallFrom(balls[0]); const a=balls[0], b=balls[1]; const sb0=Math.hypot(b.dx,b.dy); activateBoostFor(a,1.5,1); saveBall(a); console.assert(Math.abs(Math.hypot(b.dx,b.dy) - sb0) < 1e-6, 'Other ball speed unchanged by boost');
+      while(balls.length>1) balls.pop(); duplicateBallFrom(balls[0]); const a=balls[0], b=balls[1]; const sb0=Math.hypot(b.dx,b.dy); activateBoostFor(a,1.5,1); saveBall(a); assert(Math.abs(Math.hypot(b.dx,b.dy) - sb0) < 1e-6, 'Other ball speed unchanged by boost');
       // Bomb final hit should bounce and boost only triggering ball
       (function(){
         while(balls.length>1) balls.pop();
@@ -970,9 +977,9 @@
           const speedBefore = Math.hypot(dx,dy);
           target.br.hp = 1; // make this the final hit (explosion path)
           collisionDetectionForBall(balls[0], 16.67); // Use default dt for tests
-          console.assert(dy < 0, 'Bomb final hit should bounce (dy inverted)');
+          assert(dy < 0, 'Bomb final hit should bounce (dy inverted)');
           const speedAfter = Math.hypot(dx,dy);
-          console.assert(speedAfter > speedBefore*1.2, 'Bomb explosion should increase speed of triggering ball');
+          assert(speedAfter > speedBefore*1.2, 'Bomb explosion should increase speed of triggering ball');
         }
       })();
 
@@ -982,9 +989,9 @@
       function findNormal(){ for(let c=0;c<brick.cols;c++) for(let r=0;r<brick.rows;r++){ const br=bricks[c][r]; if(br.status===1 && br.type==='normal') return {c,r,br}; } return null; }
       // Single-ball scoring (combo starts at 1 ⇒ +1)
       while(balls.length>1) balls.pop();
-      let t = findNormal(); if(t){ const s0=score; const f0=floaters.length; const b=balls[0]; b.combo=1; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y-ballR+1; collisionDetectionForBall(b, 16.67); console.assert(score===s0+1, 'Score should increase by 1 (combo1×1 ball)'); console.assert(b.combo===2, 'Combo should increment to 2 after brick'); console.assert(floaters.length===f0+1 && floaters[floaters.length-1].txt==='+1','Floater +1 should spawn on score'); t.br.status=1; t.br.hp=1; }
+      let t = findNormal(); if(t){ const s0=score; const f0=floaters.length; const b=balls[0]; b.combo=1; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y-ballR+1; collisionDetectionForBall(b, 16.67); assert(score===s0+1, 'Score should increase by 1 (combo1×1 ball)'); assert(b.combo===2, 'Combo should increment to 2 after brick'); assert(floaters.length===f0+1 && floaters[floaters.length-1].txt==='+1','Floater +1 should spawn on score'); t.br.status=1; t.br.hp=1; }
       // Two-ball scoring with same ball (combo now 2 ⇒ +4)
-      duplicateBallFrom(balls[0]); t = findNormal(); if(t){ const s1=score; const f1=floaters.length; const b=balls[0]; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y-ballR+1; collisionDetectionForBall(b, 16.67); console.assert(score===s1+4, 'Score should increase by 4 (combo2×2 balls)'); console.assert(b.combo===3, 'Combo should increment to 3 after second brick'); console.assert(floaters.length===f1+1 && floaters[floaters.length-1].txt==='+4','Floater +4 should spawn on score'); t.br.status=1; t.br.hp=1; }
+      duplicateBallFrom(balls[0]); t = findNormal(); if(t){ const s1=score; const f1=floaters.length; const b=balls[0]; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y-ballR+1; collisionDetectionForBall(b, 16.67); assert(score===s1+4, 'Score should increase by 4 (combo2×2 balls)'); assert(b.combo===3, 'Combo should increment to 3 after second brick'); assert(floaters.length===f1+1 && floaters[floaters.length-1].txt==='+4','Floater +4 should spawn on score'); t.br.status=1; t.br.hp=1; }
 
       // BallSaver tests: 3 charges per game, persist across life, reset on full reset
       while(balls.length<2) duplicateBallFrom(balls[0]);
@@ -992,39 +999,39 @@
       saverCharges = SAVER_MAX;
       const c0 = saverCharges;
       const fired1 = activateBallSaver();
-      console.assert(fired1 === true && balls[0].dy < 0, 'BallSaver flips downward balls');
-      console.assert(saverCharges === c0-1, 'BallSaver decrements charges by 1');
+      assert(fired1 === true && balls[0].dy < 0, 'BallSaver flips downward balls');
+      assert(saverCharges === c0-1, 'BallSaver decrements charges by 1');
       // use again when a ball is falling
       balls[0].dy = 2; const fired2 = activateBallSaver();
-      console.assert(fired2 === true && saverCharges === c0-2, 'BallSaver second use decrements again');
+      assert(fired2 === true && saverCharges === c0-2, 'BallSaver second use decrements again');
       // no falling balls shouldn't consume a charge
       balls[0].dy = -1; balls[1].dy = -1; const firedNo = activateBallSaver();
-      console.assert(firedNo === false && saverCharges === c0-2, 'No charge consumed when nothing to flip');
+      assert(firedNo === false && saverCharges === c0-2, 'No charge consumed when nothing to flip');
       // respawn should NOT reset charges
       const keepCharges = saverCharges; lastBallOut();
-      console.assert(saverCharges === keepCharges, 'Saver charges persist after respawn');
-      console.assert(paused === true && needsStart === true, 'Respawn should pause and wait to serve');
+      assert(saverCharges === keepCharges, 'Saver charges persist after respawn');
+      assert(paused === true && needsStart === true, 'Respawn should pause and wait to serve');
       // full reset should restore charges
       resetLevel(true);
-      console.assert(saverCharges === SAVER_MAX, 'Full reset restores saver charges to max');
+      assert(saverCharges === SAVER_MAX, 'Full reset restores saver charges to max');
       // Restart via function (simulating global Enter)
       score = 123; balls.length = 0; initBallsSingle(); saverCharges = 1; paused = false; needsStart = false; floaters.length = 0; shake = 5;
       restartGame();
-      console.assert(paused === false && needsStart === false, 'Restart should immediately start the game');
-      console.assert(score === 0, 'Restart resets score');
-      console.assert(balls.length === 1, 'Restart leaves a single ball');
-      console.assert(saverCharges === SAVER_MAX, 'Restart restores saver charges');
+      assert(paused === false && needsStart === false, 'Restart should immediately start the game');
+      assert(score === 0, 'Restart resets score');
+      assert(balls.length === 1, 'Restart leaves a single ball');
+      assert(saverCharges === SAVER_MAX, 'Restart restores saver charges');
       // Debug end screen should pause and display score without changing it
       const originalHighScore = getHighScore();
       score = 4321; lastOverlay = {message:'',showScore:false}; paused = false; endGameNow();
-      console.assert(paused === true, 'endGameNow should pause the game');
-      console.assert(lastOverlay && lastOverlay.showScore === true, 'End screen should show score line');
-      console.assert(/YOU WIN/.test(lastOverlay.message), 'End screen message should indicate win');
-      console.assert(score === 4321, 'endGameNow must not change the score');
+      assert(paused === true, 'endGameNow should pause the game');
+      assert(lastOverlay && lastOverlay.showScore === true, 'End screen should show score line');
+      assert(/YOU WIN/.test(lastOverlay.message), 'End screen message should indicate win');
+      assert(score === 4321, 'endGameNow must not change the score');
       // Restore original high score after test
       setHighScore(originalHighScore);
       let aliveAfter = 0; for(let c=0;c<brick.cols;c++) for(let r=0;r<brick.rows;r++) if(bricks[c][r].status===1) aliveAfter++;
-      console.assert(aliveAfter === brick.cols*brick.rows, 'Restart re-randomizes full grid of bricks');
+      assert(aliveAfter === brick.cols*brick.rows, 'Restart re-randomizes full grid of bricks');
 
       // Restore bricks to snapshot (prevent missing block on first run)
       for(let c=0;c<brick.cols;c++){
@@ -1034,13 +1041,13 @@
         }
       }
       let alive=0; for(let c=0;c<brick.cols;c++) for(let r=0;r<brick.rows;r++) if(bricks[c][r].status===1) alive++;
-      console.assert(alive===expectedAlive, 'Bricks restored after tests');
+      assert(alive===expectedAlive, 'Bricks restored after tests');
 
       // === CLEANUP: tests must not alter gameplay state ===
       while(balls.length > 1) balls.pop();
       if(balls.length === 0) initBallsSingle();
       paused = true; needsStart = true; score = 0; lastOverlay = {message:'',showScore:false}; serveMessage='Press Space to start';
-      console.assert(balls.length === 1 && paused && needsStart && score === 0, 'Post-test cleanup: single ball, waiting to start, score 0');
+      assert(balls.length === 1 && paused && needsStart && score === 0, 'Post-test cleanup: single ball, waiting to start, score 0');
 
       // Restore SFX, shake, and explosions; ensure audio context didn't auto-create
       Object.keys(sfxBackup).forEach(k=> SFX[k] = sfxBackup[k]);
@@ -1048,16 +1055,16 @@
       shake = 0;
       floaters.length = 0; // 🔧 ensure tests don't leave any on-screen score popups
       explosions.length = 0; // 🔧 clear any explosions created during tests
-      console.assert(AC === acWas, 'Audio should not auto-start during tests');
-      console.assert(shake === 0, 'No residual shake after tests');
-      console.assert(floaters.length === 0, 'No residual score popups after tests');
+      assert(AC === acWas, 'Audio should not auto-start during tests');
+      assert(shake === 0, 'No residual shake after tests');
+      assert(floaters.length === 0, 'No residual score popups after tests');
 
       // Test high score functionality
       const testHighScore = getHighScore();
       setHighScore(1000);
-      console.assert(getHighScore() === 1000, 'High score should be set to 1000');
+      assert(getHighScore() === 1000, 'High score should be set to 1000');
       setHighScore(testHighScore); // restore original
-      console.assert(getHighScore() === testHighScore, 'High score should be restored');
+      assert(getHighScore() === testHighScore, 'High score should be restored');
 
       console.log('All tests passed.');
       console.groupEnd();
