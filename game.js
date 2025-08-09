@@ -973,7 +973,7 @@
         let target=null; for(let c=0;c<brick.cols;c++){ for(let r=0;r<brick.rows;r++){ const br=bricks[c][r]; if(br.status===1 && br.type==='bomb'){ target={c,r,br}; break; } } if(target) break; }
         if(target){
           useBall(balls[0]); dx=0; dy=2; // moving down onto the brick
-          ballX = target.br.x + brick.w/2; ballY = target.br.y - ballR/2; // overlapping the brick from above
+          ballX = target.br.x + brick.w/2; ballY = target.br.y + brick.h/2; // center of the brick
           const speedBefore = Math.hypot(dx,dy);
           target.br.hp = 1; // make this the final hit (explosion path)
           collisionDetectionForBall(balls[0], 16.67); // Use default dt for tests
@@ -989,9 +989,9 @@
       function findNormal(){ for(let c=0;c<brick.cols;c++) for(let r=0;r<brick.rows;r++){ const br=bricks[c][r]; if(br.status===1 && br.type==='normal') return {c,r,br}; } return null; }
       // Single-ball scoring (combo starts at 1 ⇒ +1)
       while(balls.length>1) balls.pop();
-      let t = findNormal(); if(t){ const s0=score; const f0=floaters.length; const b=balls[0]; b.combo=1; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y-ballR/2; collisionDetectionForBall(b, 16.67); assert(score===s0+1, 'Score should increase by 1 (combo1×1 ball)'); assert(b.combo===2, 'Combo should increment to 2 after brick'); assert(floaters.length===f0+1 && floaters[floaters.length-1].txt==='+1','Floater +1 should spawn on score'); t.br.status=1; t.br.hp=1; }
+      let t = findNormal(); if(t){ const s0=score; const f0=floaters.length; const b=balls[0]; b.combo=1; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y+brick.h/2; collisionDetectionForBall(b, 16.67); assert(score===s0+1, 'Score should increase by 1 (combo1×1 ball)'); assert(b.combo===2, 'Combo should increment to 2 after brick'); assert(floaters.length===f0+1 && floaters[floaters.length-1].txt==='+1','Floater +1 should spawn on score'); t.br.status=1; t.br.hp=1; }
       // Two-ball scoring with same ball (combo now 2 ⇒ +4)
-      duplicateBallFrom(balls[0]); t = findNormal(); if(t){ const s1=score; const f1=floaters.length; const b=balls[0]; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y-ballR/2; collisionDetectionForBall(b, 16.67); assert(score===s1+4, 'Score should increase by 4 (combo2×2 balls)'); assert(b.combo===3, 'Combo should increment to 3 after second brick'); assert(floaters.length===f1+1 && floaters[floaters.length-1].txt==='+4','Floater +4 should spawn on score'); t.br.status=1; t.br.hp=1; }
+      duplicateBallFrom(balls[0]); t = findNormal(); if(t){ const s1=score; const f1=floaters.length; const b=balls[0]; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y+brick.h/2; collisionDetectionForBall(b, 16.67); assert(score===s1+4, 'Score should increase by 4 (combo2×2 balls)'); assert(b.combo===3, 'Combo should increment to 3 after second brick'); assert(floaters.length===f1+1 && floaters[floaters.length-1].txt==='+4','Floater +4 should spawn on score'); t.br.status=1; t.br.hp=1; }
 
       // BallSaver tests: 3 charges per game, persist across life, reset on full reset
       while(balls.length<2) duplicateBallFrom(balls[0]);
