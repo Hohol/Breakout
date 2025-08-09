@@ -817,14 +817,15 @@
   }
 
   // ===== Self‑tests (console) =====
-  function assert(condition, message) {
-    if (!condition) {
-      console.error('Test failed:', message);
-      throw new Error(message);
-    }
-  }
-  
   function runSelfTests(){
+    const failures = [];
+    function assert(condition, message) {
+      if (!condition) {
+        console.error('Test failed:', message);
+        failures.push(message);
+      }
+    }
+    
     try {
       // Snapshot bricks so tests can't leave one destroyed
       const bricksSnapshot = bricks.map(col=>col.map(b=>({status:b.status,type:b.type,hp:b.hp})));
@@ -1066,11 +1067,17 @@
       setHighScore(testHighScore); // restore original
       assert(getHighScore() === testHighScore, 'High score should be restored');
 
-      console.log('All tests passed.');
+      if (failures.length > 0) {
+        console.error(`${failures.length} test(s) failed:`);
+        failures.forEach((failure, i) => console.error(`${i + 1}. ${failure}`));
+        alert(`⚠️ BREAKOUT SELF-TESTS FAILED!\n\n${failures.length} test(s) failed:\n\n${failures.slice(0, 5).map((f, i) => `${i + 1}. ${f}`).join('\n')}${failures.length > 5 ? '\n\n...and ' + (failures.length - 5) + ' more. Check console for details.' : ''}`);
+      } else {
+        console.log('All tests passed.');
+      }
       console.groupEnd();
     } catch (e) { 
-      console.error('Self‑tests failed:', e); 
-      alert('⚠️ BREAKOUT SELF-TESTS FAILED!\n\nCheck browser console for details.\n\nError: ' + e.message);
+      console.error('Self‑tests failed with exception:', e); 
+      alert('⚠️ BREAKOUT SELF-TESTS CRASHED!\n\nCheck browser console for details.\n\nError: ' + e.message);
     }
   }
 
