@@ -334,8 +334,8 @@
     dx = speed*Math.sin(ang);
     dy = -Math.abs(speed*Math.cos(ang));
     SFX.paddle(rel, speed);
-    // Combo resets on paddle touch
-    b.combo = 1;
+    // Combo decays on paddle touch (halved, minimum 1)
+    b.combo = Math.max(1, Math.floor((b.combo || 1) / 2));
     // Spin
     ballSpinSpeed += rel * 0.35;
     if(ballSpinSpeed>1.3) ballSpinSpeed=1.3;
@@ -920,7 +920,7 @@
         onPaddleHit(b, 0, Math.hypot(dx,dy));
         assert(score === s0 - 1, 'Paddle hit should deduct 1 point');
         assert(floaters.length === f0 + 1 && floaters[floaters.length-1].txt === '-1', 'Penalty floater "-1" should spawn');
-        assert(b.combo === 1, 'Paddle hit resets combo to 1');
+        assert(b.combo === 1, 'Paddle hit decays combo (test starts with combo 1, so stays 1)');
       }
 
       // Ball-lost penalty: -10 points and floater
