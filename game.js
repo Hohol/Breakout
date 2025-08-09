@@ -528,7 +528,7 @@
   function showOverlay(message, opts={}){
     const {showScore=false, showHighScore=false, isNewHighScore=false, highScore=0} = opts;
     lastOverlay = {message, showScore, showHighScore, isNewHighScore, highScore};
-    console.log('showOverlay called with:', {message, showScore, showHighScore, isNewHighScore, highScore});
+
     ctx.save();
     ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,0,W,H);
     ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -538,7 +538,7 @@
       ctx.font='16px system-ui,-apple-system,Segoe UI,Roboto,Arial';
       ctx.fillText('Score: '+score, W/2, H/2 + 5);
       if(showHighScore && isNewHighScore){
-        console.log('Drawing NEW HIGH SCORE message');
+
         ctx.fillStyle = '#ffd43b';
         ctx.fillText('New high score!', W/2, H/2 + 25);
         ctx.fillStyle = '#fff';
@@ -575,13 +575,13 @@
 
   function updateHighScore(){
     const currentHigh = getHighScore();
-    console.log('Current score:', score, 'Current high score:', currentHigh);
+
     if(score > currentHigh){
       setHighScore(score);
-      console.log('New high score set!');
+
       return true; // new high score
     }
-    console.log('No new high score');
+
     return false; // no new high score
   }
 
@@ -593,7 +593,7 @@
     const isNewHighScore = updateHighScore();
     const highScore = getHighScore();
     
-    console.log('Win screen - isNewHighScore:', isNewHighScore, 'highScore:', highScore);
+
     
     showOverlay('YOU WIN! 🎉', {showScore:true, showHighScore:true, isNewHighScore, highScore});
     // Don't wait for input - let the main Space handler restart the game
