@@ -1061,7 +1061,10 @@
 
       console.log('All tests passed.');
       console.groupEnd();
-    } catch (e) { console.error('Self‑tests failed:', e); }
+    } catch (e) { 
+      console.error('Self‑tests failed:', e); 
+      alert('⚠️ BREAKOUT SELF-TESTS FAILED!\n\nCheck browser console for details.\n\nError: ' + e.message);
+    }
   }
 
   // Kick off
