@@ -546,22 +546,16 @@
 
   // ===== High Score Management =====
   function getHighScore(){
-    const cookies = document.cookie.split(';');
-    for(const cookie of cookies){
-      const [name, value] = cookie.trim().split('=');
-      if(name === 'breakout_high_score'){
-        return parseInt(value) || 0;
-      }
-    }
-    return 0;
+    const stored = localStorage.getItem('breakout_high_score');
+    return parseInt(stored) || 0;
   }
 
   function setHighScore(score){
-    document.cookie = `breakout_high_score=${score};max-age=31536000;path=/`; // 1 year expiry
+    localStorage.setItem('breakout_high_score', score.toString());
   }
 
   function clearHighScore(){
-    document.cookie = 'breakout_high_score=;max-age=0;path=/';
+    localStorage.removeItem('breakout_high_score');
   }
   
   // Make functions accessible globally for debugging
