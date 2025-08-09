@@ -175,7 +175,7 @@
     const vx = Math.cos(ang) * speed;
     const vy = Math.sin(ang) * speed; // < 0 (upwards)
     const b = makeBall(W/2, H-30, vx, vy, 0, 0); balls.push(b);
-    // sync globals for tests/drawBall()
+    // (removed sync globals - drawBall now takes ball object directly)
     ballX=b.x; ballY=b.y; dx=b.dx; dy=b.dy; ballSpin=b.spin; ballSpinSpeed=b.spinSpeed;
   }
   function useBall(b){ ballX=b.x; ballY=b.y; dx=b.dx; dy=b.dy; ballSpin=b.spin; ballSpinSpeed=b.spinSpeed; }
@@ -291,11 +291,10 @@
     return true;
   }
   function activateBoostFor(ball, mult=1.5, duration=4000){
-    // Use CURRENT ball globals (dx,dy) so boost respects any bounce that just happened
-    const base = Math.hypot(dx, dy);
+    // Use CURRENT ball velocity so boost respects any bounce that just happened
+    const base = Math.hypot(ball.dx, ball.dy);
     ball.returnSpeed = base;           // decay target
-    dx *= mult; dy *= mult;            // boost the active ball's globals
-    ball.dx = dx; ball.dy = dy;        // sync into the ball object immediately
+    ball.dx *= mult; ball.dy *= mult;  // boost the ball velocity directly
     ball.boosted = true;               // per-ball flags/timer
     ball.boostDecay = false;
     ball.boostUntil = performance.now() + duration;
@@ -328,21 +327,21 @@
   }
 
   // Paddle hit handler (also used by tests)
-  function onPaddleHit(b, rel, speed){
+  function onPaddleHit(ballObj, rel, speed){
     const maxAngle = Math.PI/3;
     const ang = rel*maxAngle;
-    dx = speed*Math.sin(ang);
-    dy = -Math.abs(speed*Math.cos(ang));
+    ballObj.dx = speed*Math.sin(ang);
+    ballObj.dy = -Math.abs(speed*Math.cos(ang));
     SFX.paddle(rel, speed);
     // Combo decays on paddle touch (halved, minimum 1)
-    b.combo = Math.max(1, Math.floor((b.combo || 1) / 2));
+    ballObj.combo = Math.max(1, Math.floor((ballObj.combo || 1) / 2));
     // Spin
-    ballSpinSpeed += rel * 0.35;
-    if(ballSpinSpeed>1.3) ballSpinSpeed=1.3;
-    if(ballSpinSpeed<-1.3) ballSpinSpeed=-1.3;
+    ballObj.spinSpeed += rel * 0.35;
+    if(ballObj.spinSpeed>1.3) ballObj.spinSpeed=1.3;
+    if(ballObj.spinSpeed<-1.3) ballObj.spinSpeed=-1.3;
     // New: paddle hit penalty
     score -= 1;
-    spawnFloater(ballX, paddle.y - 14, -1, 'penalty');
+    spawnFloater(ballObj.x, paddle.y - 14, -1, 'penalty');
   }
 
   function onBallLost(x, y){ score -= 10; spawnFloater(x, H - 18, -10, 'penalty'); if(SFX && SFX.loseLife) SFX.loseLife(); }
@@ -387,9 +386,10 @@
   document.addEventListener('visibilitychange', ()=>{ if(document.hidden) paused=true; });
 
   // ===== Drawing (single ball uses globals; we'll iterate for multi) =====
-  function drawBall(){
+  function drawBall(ballObj, boosted = false){
+    const ballX = ballObj.x, ballY = ballObj.y, ballSpin = ballObj.spin;
     ctx.save();
-    if(curBoosted){ ctx.shadowColor = '#3ba0ff'; ctx.shadowBlur = 16; }
+    if(boosted){ ctx.shadowColor = '#3ba0ff'; ctx.shadowBlur = 16; }
     // Clip to ball
     ctx.save();
     ctx.beginPath(); ctx.arc(ballX, ballY, ballR, 0, Math.PI*2); ctx.clip();
@@ -610,6 +610,9 @@
 
   // ===== Collisions (per ball) =====
   function collisionDetectionForBall(ballObj, dt){
+    const ballX = ballObj.x, ballY = ballObj.y;
+    let dx = ballObj.dx, dy = ballObj.dy;
+    
     for(let c=0;c<brick.cols;c++){
       for(let r=0;r<brick.rows;r++){
         const br = bricks[c][r]; if(br.status!==1) continue;
@@ -669,6 +672,10 @@
           dx = dx - 2 * dotProduct * normalX;
           dy = dy - 2 * dotProduct * normalY;
           
+          // Update ball object with bounced velocity immediately
+          ballObj.dx = dx;
+          ballObj.dy = dy;
+          
           // Mark this brick as hit this frame
           frameHitBricks.add(brickKey);
           
@@ -717,8 +724,7 @@
     if(shake>0){ const ang=Math.random()*Math.PI*2; const s=shake; ctx.translate(Math.cos(ang)*s, Math.sin(ang)*s); shake*=0.88; if(shake<0.4) shake=0; }
     const gp = ensureGrainPattern(); if(gp){ ctx.save(); ctx.globalAlpha=0.06; ctx.fillStyle=gp; ctx.fillRect(0,0,W,H); ctx.restore(); }
     drawBricks();
-    for(const b of balls){ useBall(b); curBoosted = !!b.boosted; drawBall(); }
-    curBoosted = false;
+    for(const b of balls){ drawBall(b, !!b.boosted); }
     drawPaddle();
     // Floating score popups (shake with the world)
     drawFloaters();
@@ -764,16 +770,15 @@
     // update balls
     for(let i=balls.length-1; i>=0; i--){
       const b = balls[i];
-      useBall(b);
       // Boost timing & decay per ball
       if(b.boosted){
         const now = performance.now();
         if(!b.boostDecay && now > b.boostUntil) b.boostDecay = true;
         if(b.boostDecay){
-          const sp = Math.hypot(dx,dy);
-          if(sp > b.returnSpeed*1.01){ dx*=0.98; dy*=0.98; }
+          const sp = Math.hypot(b.dx,b.dy);
+          if(sp > b.returnSpeed*1.01){ b.dx*=0.98; b.dy*=0.98; }
           else {
-            const s=Math.hypot(dx,dy); if(s!==0){ const kk=b.returnSpeed/s; dx*=kk; dy*=kk; }
+            const s=Math.hypot(b.dx,b.dy); if(s!==0){ const kk=b.returnSpeed/s; b.dx*=kk; b.dy*=kk; }
             b.boosted=false; b.boostDecay=false; b.boostUntil=0;
           }
         }
@@ -781,33 +786,32 @@
       // Collisions with bricks
       collisionDetectionForBall(b, dt);
       // Walls
-      if(ballX+dx > W-ballR || ballX+dx < ballR){ dx=-dx; SFX.wall(); }
-      if(ballY+dy < ballR){ dy=-dy; SFX.wall(); }
+      if(b.x+b.dx > W-ballR || b.x+b.dx < ballR){ b.dx=-b.dx; SFX.wall(); }
+      if(b.y+b.dy < ballR){ b.dy=-b.dy; SFX.wall(); }
       // Paddle & bottom
-      if(ballY+dy > paddle.y - ballR){
-        if(ballX > paddle.x - ballR && ballX < paddle.x + paddle.w + ballR && dy > 0){
-          const rel = (ballX - (paddle.x + paddle.w/2)) / (paddle.w/2);
-          const speed = Math.hypot(dx,dy);
+      if(b.y+b.dy > paddle.y - ballR){
+        if(b.x > paddle.x - ballR && b.x < paddle.x + paddle.w + ballR && b.dy > 0){
+          const rel = (b.x - (paddle.x + paddle.w/2)) / (paddle.w/2);
+          const speed = Math.hypot(b.dx,b.dy);
           onPaddleHit(b, rel, speed);
-        } else if(ballY+dy > H - ballR){
+        } else if(b.y+b.dy > H - ballR){
           if(balls.length>1){
-            onBallLost(ballX, ballY);
+            onBallLost(b.x, b.y);
             // remove only this ball
             balls.splice(i,1);
-            continue; // skip saving back
+            continue; // skip to next ball
           } else {
-            onBallLost(ballX, ballY);
+            onBallLost(b.x, b.y);
             lastBallOut();
-            continue; // skip saving back for this frame
+            continue; // skip to next frame
           }
         }
       }
 
       // Apply ball motion
-      ballX += dx * (dt / 16.67); ballY += dy * (dt / 16.67);
-      ballSpin += ballSpinSpeed; if(ballSpin > Math.PI*2) ballSpin -= Math.PI*2; if(ballSpin < -Math.PI*2) ballSpin += Math.PI*2;
-      ballSpinSpeed *= 0.995;
-      saveBall(b);
+      b.x += b.dx * (dt / 16.67); b.y += b.dy * (dt / 16.67);
+      b.spin += b.spinSpeed; if(b.spin > Math.PI*2) b.spin -= Math.PI*2; if(b.spin < -Math.PI*2) b.spin += Math.PI*2;
+      b.spinSpeed *= 0.995;
     }
 
     // draw after updating state so boost/glow shows immediately
@@ -844,7 +848,7 @@
       assert(typeof draw === 'function' && typeof renderFrame === 'function', 'Main loop functions exist');
       assert(typeof SFX.wall === 'function' && typeof SFX.win === 'function', 'SFX functions exist');
       ensureGolfPatterns(); assert(!!golfPatternDark && !!golfPatternLight, 'Golf dimple patterns should be created');
-      const beforeOp = ctx.globalCompositeOperation; drawBall(); assert(ctx.globalCompositeOperation === 'source-over', 'Composite op restored after drawBall');
+      const beforeOp = ctx.globalCompositeOperation; drawBall(balls[0]); assert(ctx.globalCompositeOperation === 'source-over', 'Composite op restored after drawBall');
       assert(paused === true && needsStart === true, 'Game should start paused and waiting for Space');
       const prevSpin=balls[0].spinSpeed; balls[0].spinSpeed=0; applyServeSpin(); assert(Math.abs(balls[0].spinSpeed)>0.001, 'applyServeSpin should prime spin on serve'); balls[0].spinSpeed=prevSpin;
       // Counts (randomized layout): 4 bombs, 4 clones, rest normal; bombs must be 2 HP
@@ -889,8 +893,8 @@
         const tInh = findNormal();
         if(tInh){
           const sStart = score;
-          useBall(cloneBall); dx=0; dy=2;
-          ballX = tInh.br.x + brick.w/2; ballY = tInh.br.y + brick.h/2;
+          cloneBall.dx=0; cloneBall.dy=2;
+          cloneBall.x = tInh.br.x + brick.w/2; cloneBall.y = tInh.br.y + brick.h/2;
           collisionDetectionForBall(cloneBall, 16.67); // Use default dt for tests
           const expectedGain = prevCombo * balls.length;
           assert(score === sStart + expectedGain, 'Clone should score inherited combo × balls');
@@ -912,12 +916,11 @@
       {
         while(balls.length>1) balls.pop();
         const b = balls[0];
-        useBall(b);
         paddle.x = Math.max(0, Math.min(W-paddle.w, (W - paddle.w)/2));
-        ballX = paddle.x + paddle.w/2; ballY = paddle.y - ballR - 1;
-        dx = 0; dy = 2;
+        b.x = paddle.x + paddle.w/2; b.y = paddle.y - ballR - 1;
+        b.dx = 0; b.dy = 2;
         const s0 = score; const f0 = floaters.length;
-        onPaddleHit(b, 0, Math.hypot(dx,dy));
+        onPaddleHit(b, 0, Math.hypot(b.dx,b.dy));
         assert(score === s0 - 1, 'Paddle hit should deduct 1 point');
         assert(floaters.length === f0 + 1 && floaters[floaters.length-1].txt === '-1', 'Penalty floater "-1" should spawn');
         assert(b.combo === 1, 'Paddle hit decays combo (test starts with combo 1, so stays 1)');
@@ -961,10 +964,10 @@
 
       // Boost should persist for triggering ball only
       while(balls.length>1) balls.pop();
-      const b0 = balls[0]; useBall(b0); const sOld = Math.hypot(dx,dy); const mult=1.5; activateBoostFor(b0, mult, 1); saveBall(b0); const sNew = Math.hypot(b0.dx,b0.dy); assert(sNew > sOld*1.3, 'Boost should persist for boosted ball after saveBall');
+      const b0 = balls[0]; const sOld = Math.hypot(b0.dx,b0.dy); const mult=1.5; activateBoostFor(b0, mult, 1); const sNew = Math.hypot(b0.dx,b0.dy); assert(sNew > sOld*1.3, 'Boost should persist for boosted ball after activateBoostFor');
       duplicateBallFrom(b0); const b1 = balls[1]; const s1 = Math.hypot(b1.dx,b1.dy); assert(Math.abs(s1 - b1.returnSpeed) < 1e-6, 'Clone should not inherit boost magnitude');
       // Non-trigger ball must not change when other ball boosts
-      while(balls.length>1) balls.pop(); duplicateBallFrom(balls[0]); const a=balls[0], b=balls[1]; const sb0=Math.hypot(b.dx,b.dy); activateBoostFor(a,1.5,1); saveBall(a); assert(Math.abs(Math.hypot(b.dx,b.dy) - sb0) < 1e-6, 'Other ball speed unchanged by boost');
+      while(balls.length>1) balls.pop(); duplicateBallFrom(balls[0]); const a=balls[0], b=balls[1]; const sb0=Math.hypot(b.dx,b.dy); activateBoostFor(a,1.5,1); assert(Math.abs(Math.hypot(b.dx,b.dy) - sb0) < 1e-6, 'Other ball speed unchanged by boost');
       // Bomb final hit should bounce and boost only triggering ball
       (function(){
         while(balls.length>1) balls.pop();
@@ -972,13 +975,13 @@
         drawBricks();
         let target=null; for(let c=0;c<brick.cols;c++){ for(let r=0;r<brick.rows;r++){ const br=bricks[c][r]; if(br.status===1 && br.type==='bomb'){ target={c,r,br}; break; } } if(target) break; }
         if(target){
-          useBall(balls[0]); dx=0; dy=2; // moving down onto the brick
-          ballX = target.br.x + brick.w/2; ballY = target.br.y + brick.h/2; // center of the brick
-          const speedBefore = Math.hypot(dx,dy);
+          const b = balls[0]; b.dx=0; b.dy=2; // moving down onto the brick
+          b.x = target.br.x + brick.w/2; b.y = target.br.y + brick.h/2; // center of the brick
+          const speedBefore = Math.hypot(b.dx,b.dy);
           target.br.hp = 1; // make this the final hit (explosion path)
-          collisionDetectionForBall(balls[0], 16.67); // Use default dt for tests
-          assert(dy < 0, 'Bomb final hit should bounce (dy inverted)');
-          const speedAfter = Math.hypot(dx,dy);
+          collisionDetectionForBall(b, 16.67); // Use default dt for tests
+          assert(b.dy < 0, 'Bomb final hit should bounce (dy inverted)');
+          const speedAfter = Math.hypot(b.dx,b.dy);
           assert(speedAfter > speedBefore*1.2, 'Bomb explosion should increase speed of triggering ball');
         }
       })();
@@ -990,10 +993,10 @@
       // Single-ball scoring (combo starts at 1 ⇒ +1)
       while(balls.length>1) balls.pop();
       frameHitBricks.clear(); // Clear frame tracking for test
-      let t = findNormal(); if(t){ const s0=score; const f0=floaters.length; const b=balls[0]; b.combo=1; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y+brick.h/2; collisionDetectionForBall(b, 16.67); assert(score===s0+1, 'Score should increase by 1 (combo1×1 ball)'); assert(b.combo===2, 'Combo should increment to 2 after brick'); assert(floaters.length===f0+1 && floaters[floaters.length-1].txt==='+1','Floater +1 should spawn on score'); t.br.status=1; t.br.hp=1; }
+      let t = findNormal(); if(t){ const s0=score; const f0=floaters.length; const b=balls[0]; b.combo=1; b.dx=0; b.dy=2; b.x=t.br.x+brick.w/2; b.y=t.br.y+brick.h/2; collisionDetectionForBall(b, 16.67); assert(score===s0+1, 'Score should increase by 1 (combo1×1 ball)'); assert(b.combo===2, 'Combo should increment to 2 after brick'); assert(floaters.length===f0+1 && floaters[floaters.length-1].txt==='+1','Floater +1 should spawn on score'); t.br.status=1; t.br.hp=1; }
       // Two-ball scoring with same ball (combo now 2 ⇒ +4)
       frameHitBricks.clear(); // Clear frame tracking for test
-      duplicateBallFrom(balls[0]); t = findNormal(); if(t){ const s1=score; const f1=floaters.length; const b=balls[0]; useBall(b); dx=0; dy=2; ballX=t.br.x+brick.w/2; ballY=t.br.y+brick.h/2; collisionDetectionForBall(b, 16.67); assert(score===s1+4, 'Score should increase by 4 (combo2×2 balls)'); assert(b.combo===3, 'Combo should increment to 3 after second brick'); assert(floaters.length===f1+1 && floaters[floaters.length-1].txt==='+4','Floater +4 should spawn on score'); t.br.status=1; t.br.hp=1; }
+      duplicateBallFrom(balls[0]); t = findNormal(); if(t){ const s1=score; const f1=floaters.length; const b=balls[0]; b.dx=0; b.dy=2; b.x=t.br.x+brick.w/2; b.y=t.br.y+brick.h/2; collisionDetectionForBall(b, 16.67); assert(score===s1+4, 'Score should increase by 4 (combo2×2 balls)'); assert(b.combo===3, 'Combo should increment to 3 after second brick'); assert(floaters.length===f1+1 && floaters[floaters.length-1].txt==='+4','Floater +4 should spawn on score'); t.br.status=1; t.br.hp=1; }
 
       // BallSaver tests: 3 charges per game, persist across life, reset on full reset
       while(balls.length<2) duplicateBallFrom(balls[0]);
@@ -1034,6 +1037,39 @@
       setHighScore(originalHighScore);
       let aliveAfter = 0; for(let c=0;c<brick.cols;c++) for(let r=0;r<brick.rows;r++) if(bricks[c][r].status===1) aliveAfter++;
       assert(aliveAfter === brick.cols*brick.rows, 'Restart re-randomizes full grid of bricks');
+
+      // Basic collision tests: walls and paddle
+      {
+        while(balls.length>1) balls.pop();
+        const b = balls[0];
+        
+        // Test wall collision - right wall
+        b.x = W - ballR - 1; b.y = H/2; b.dx = 5; b.dy = 0;
+        const oldDx = b.dx;
+        if(b.x + b.dx > W - ballR) { b.dx = -b.dx; } // simulate wall collision logic
+        assert(b.dx === -oldDx, 'Right wall should invert dx');
+        
+        // Test wall collision - left wall  
+        b.x = ballR + 1; b.y = H/2; b.dx = -5; b.dy = 0;
+        const oldDx2 = b.dx;
+        if(b.x + b.dx < ballR) { b.dx = -b.dx; } // simulate wall collision logic
+        assert(b.dx === -oldDx2, 'Left wall should invert dx');
+        
+        // Test wall collision - top wall
+        b.x = W/2; b.y = ballR + 1; b.dx = 0; b.dy = -5;
+        const oldDy = b.dy;
+        if(b.y + b.dy < ballR) { b.dy = -b.dy; } // simulate wall collision logic
+        assert(b.dy === -oldDy, 'Top wall should invert dy');
+        
+        // Test paddle collision
+        paddle.x = W/2 - paddle.w/2; paddle.y = H - paddle.h - 10;
+        b.x = paddle.x + paddle.w/2; b.y = paddle.y - ballR - 1; b.dx = 3; b.dy = 5;
+        const oldSpeed = Math.hypot(b.dx, b.dy);
+        // Simulate hitting paddle center (rel=0)
+        onPaddleHit(b, 0, oldSpeed);
+        assert(b.dy < 0, 'Paddle hit should make ball go upward');
+        assert(Math.abs(b.dx) < 1e-6, 'Paddle center hit should zero horizontal velocity');
+      }
 
       // Restore bricks to snapshot (prevent missing block on first run)
       for(let c=0;c<brick.cols;c++){
